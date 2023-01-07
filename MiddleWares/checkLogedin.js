@@ -20,7 +20,7 @@ const veryfyJWTMiddleWare = (req, res, next) => {
         });
       } else {
         res.status(500).send({
-          msg: "server error!",
+          msg: "server error! maybe check if the token is valid",
         });
       }
     }
