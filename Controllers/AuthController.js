@@ -89,9 +89,10 @@ const logoutController = (req, res) => {
   res.status(200).send({ msg: "you have been loged out!" });
 };
 
-const NewToken = (req, res) => {
+const NewToken = async (req, res) => {
   if (req.cookies.refreshToken) {
-    const token = requestNewToken(req.cookies.refreshToken);
+    const token = await requestNewToken(req.cookies.refreshToken);
+
     return token === null
       ? res.status(401).send({ msg: "unauthorized" })
       : res.status(201).send({ accessToken: token });
