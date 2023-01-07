@@ -1,6 +1,6 @@
 const bCrypt = require("bcrypt");
-const UserModel = require("../Models/User.Model");
 const jwttoken = require("jsonwebtoken");
+const UserModel = require("../Models/User.Model");
 
 const RegisterController = async (req, res) => {
   const { username, password, email } = req.body;
@@ -22,13 +22,17 @@ const RegisterController = async (req, res) => {
 
     res.send(user);
   } catch (e) {
-    res.sendStatus(500).send({
+    res.status(500).send({
       msg: "error",
     });
   }
 };
 
 const LoginController = async (req, res) => {
+  if (req.cookies.refreshToken) {
+    res.status(200).send({ msg: "You are aready logged in!" });
+  }
+
   const { email, password } = req.body;
 
   const user = await UserModel.findOne({
@@ -36,15 +40,15 @@ const LoginController = async (req, res) => {
   }).exec();
 
   if (user == null)
-    res.sendStatus(401).send({
+    res.status(401).send({
       msg: "unauthorized!",
     });
 
   const match = await bCrypt.compare(password, user.password);
 
   if (!match)
-    res.sendStatus(401).send({
-      msg: "unauthorized!",
+    res.status(401).send({
+      msg: "Passwords don't match",
     });
   const refreshToken = jwttoken.sign(
     {
@@ -60,22 +64,66 @@ const LoginController = async (req, res) => {
     },
     process.env.ACCESS_TOKEN_KEY,
     {
-      expiresIn: "60s",
+      expiresIn: "300s",
     }
   );
   user.refreshToken = refreshToken;
   try {
     await user.save();
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-    });
-
-    res.send({ accessToken });
+    res
+      .cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+      })
+      .send({ accessToken });
   } catch (e) {
-    res.sendStatus(500).send({
+    res.status(500).send({
       msg: "could not create refersh token",
     });
   }
 };
 
-module.exports = { RegisterController, LoginController };
+const logoutController = (req, res) => {
+  req.clearCookie("refreshToken", {
+    httpOnly: true,
+  });
+  res.status(200).send({ msg: "you have been loged out!" });
+};
+
+const NewToken = (req, res) => {
+  if (req.cookies.refreshToken) {
+    const token = requestNewToken(req.cookies.refreshToken);
+    return token === null
+      ? res.status(401).send({ msg: "unauthorized" })
+      : res.status(201).send({ accessToken: token });
+  } else {
+    res.status(401).send({
+      msg: "Not authorized!",
+    });
+  }
+};
+
+const requestNewToken = async (Token) => {
+  const user = await UserModel.findOne({
+    refreshToken: Token,
+  }).exec();
+  if (!user) return null;
+
+  let newAccesstoken = jwttoken.sign(
+    {
+      username: user.username,
+      email: user.email,
+    },
+    process.env.ACCESS_TOKEN_KEY,
+    {
+      expiresIn: "200s",
+    }
+  );
+  return newAccesstoken;
+};
+
+module.exports = {
+  RegisterController,
+  LoginController,
+  logoutController,
+  NewToken,
+};

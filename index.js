@@ -1,9 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const authRoute = require("./Routes/AuthRoutes");
+const movieRoutes = require("./Routes/MovieRoutes");
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
-const { logger } = require("./MiddleWares/checkLogedin");
+const { veryfyJWTMiddleWare } = require("./MiddleWares/checkLogedin");
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -17,11 +18,12 @@ mongoose.connect(process.env.DB_URL, {
 });
 mongoose.set("strictQuery", true);
 
-app.get("/", (req, res) => {
-  if (req.cookies.accessToken) res.send({ msg: "logedin" }).end();
+app.get("/", veryfyJWTMiddleWare, (req, res) => {
+  res.send(req.user);
 });
 
 app.use("/auth", authRoute);
+app.use("/movies", veryfyJWTMiddleWare, movieRoutes);
 
 mongoose.connection.once("open", () => {
   console.log("Database Connected!");
